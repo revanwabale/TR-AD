@@ -1,17 +1,15 @@
 import argparse
 
-from pyspark import SparkConf, SparkContext
-from pyspark.sql import SQLContext, SparkSession
-from pyspark.sql.types import TimestampType, StringType, StructType, StructField, IntegerType
-import click
-from pyspark.streaming import StreamingContext
-from pyspark.sql.window import Window
+
+from pyspark.sql import  SparkSession
+from pyspark.sql.types import StringType, StructType, StructField, IntegerType
+
 import pyspark.sql.functions as f
 
 
-def getXvalue(x, inputdir):
+def getXvalue(x, inputdir,master):
 
-    spark = SparkSession.builder.appName("ProblemSolver").master('local[1]').getOrCreate()
+    spark = SparkSession.builder.appName("ProblemSolver").master(master).getOrCreate()
     #spark.conf.set("spark.sql.shuffle.partitions", 11)
     # conf = (SparkConf()
     #         .setMaster("local")
@@ -24,32 +22,35 @@ def getXvalue(x, inputdir):
                             StructField("value", StringType(), True)])
 
 
-        lines=spark.sparkContext.textFile(inputdir)
+        lines=spark.sparkContext.textFile(inputdir,5)   # time complexity = n/No.Of partition , space complexity = size of text file + size of pid columns
         sepLines=lines.map(lambda l: l.split(' '))
         df=sepLines.toDF(schema)
+
         df=df.withColumn("id", df["id"].cast(IntegerType()))
         df=df.withColumn("value", df["value"].cast(IntegerType()))
         #df.rdd.glom().count()
-        df=df.repartition(5)
-        print("Number of Partitions used to distribute this file : "+ str(df.rdd.getNumPartitions()))
+        #df=df.repartition(5)
+        #print("Number of Partitions used to distribute this file : "+ str(df.rdd.getNumPartitions()))
         #print("2: " + str(len(df.rdd.repartition(5).glom().collect())))
-
-        df=df.withColumn("pid", f.spark_partition_id()).orderBy("value")
-        df.printSchema()
-        df.show()
+        #df=df.withColumn("pid", f.spark_partition_id()).orderBy("value")
+        #df.printSchema()
+        #df.show()
 
         lookupDf = (df.select("value")
             .distinct()
             .sort(f.col("value").desc()).rdd.zipWithIndex()
             .map(lambda z: z[0] + (z[1], ))
-            .toDF(["value", "dense_rank"]))
+            .toDF(["value", "dense_rank"]))                             # time complexity = uptp 100 rows[for evaluation to create df],
 
-        df = df.join(lookupDf, ["value"]).withColumn("dense_rank", f.col("dense_rank") + 1)
+        #print("lookuop: ")
+        #lookupDf.show()
 
-        df.show()
+        df = df.join(lookupDf, ["value"]).withColumn("dense_rank", f.col("dense_rank") + 1)  # time complexity = (n * n)/No.Of partition, + shuffle[network]
+        #print("after join: ")
+        #df.show()
         df = df.filter(df['dense_rank'] <= x)
 
-        df.show()
+        #df.show()
         df = df.select(df['id'])
         pandas_df = df.toPandas()
         return pandas_df
@@ -65,12 +66,13 @@ if __name__ == '__main__':
                         #default="bqinput.txt",
                         default="exampleLargeFile.txt",
                         type=str)
+    parser.add_argument("-master", "--master", required=False, help="master",  default='local[1]', type=str)
 
 
     args = vars(parser.parse_args())
     print('passed command line argument are  --> ', args)
 
-    resultlist = getXvalue(int(args["x"]),args["inputFile"])
+    resultlist = getXvalue(int(args["x"]),args["inputFile"], args['master'])
 
     print(resultlist)
 

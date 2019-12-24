@@ -18,7 +18,7 @@ class ProblemSolverTest(PySparkBaseForTest):
         test_case1 = "testCases/test_provided_data_case1.csv"
         expectedDfId = pd.read_csv(test_case1)
 
-        result_pandas_df = getXvalue(x, absPathLargeInputFile)
+        result_pandas_df = getXvalue(x, absPathLargeInputFile, "local[1]")
 
         print(result_pandas_df)
         print(expectedDfId)
@@ -30,7 +30,7 @@ class ProblemSolverTest(PySparkBaseForTest):
         test_case2 = "testCases/test_provided_data_case2.csv"
         expectedDfId = pd.read_csv(test_case2)
 
-        result_pandas_df = getXvalue(x, absPathLargeInputFile)
+        result_pandas_df = getXvalue(x, absPathLargeInputFile, "local[2]")
 
         print(result_pandas_df)
         print(expectedDfId)
